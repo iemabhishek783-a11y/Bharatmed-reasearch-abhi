@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BharatMed Research</title>
+<style>
+:root{--bg:#f4f6f3;--ink:#13261f;--muted:#55665f;--line:#d5dcd7;--card:#fff;--accent:#0f5c4a;--saffron:#c77d0a;--warn:#fff4dc}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1a16;--ink:#e8efeb;--muted:#9bb0a7;--line:#2a3d36;--card:#15261f;--accent:#5fc3a5;--saffron:#f0b24a;--warn:#2d2410}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:16px}
+h1{font:700 1.7rem/1.2 Georgia,serif;margin:8px 0 4px}
+.sub{color:var(--muted);margin:0 0 14px}
+.notice{background:var(--warn);border-left:4px solid var(--saffron);padding:10px 12px;font-size:.9rem;border-radius:4px;margin-bottom:14px}
+form{display:grid;gap:10px}
+input[type=search],select,input[type=number]{width:100%;padding:12px;font-size:1rem;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1 1 110px}
+label.chk{display:flex;gap:8px;align-items:center;flex:1 1 100%}
+button{min-height:44px;padding:0 18px;border:0;border-radius:6px;background:var(--accent);color:#fff;font-size:1rem;font-weight:600;cursor:pointer}
+button.alt{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+button:disabled{opacity:.5}
+:focus-visible{outline:3px solid var(--saffron);outline-offset:2px}
+#status{margin:14px 0;color:var(--muted)}
+.err{color:#b3261e;font-weight:600}
+article{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin:12px 0}
+article h2{font:600 1.1rem/1.35 Georgia,serif;margin:0 0 6px}
+.meta{color:var(--muted);font-size:.88rem;margin:2px 0}
+.na{font-style:italic}
+.ids a{margin-right:12px;color:var(--accent);font-weight:600}
+.tag{display:inline-block;font-size:.78rem;border:1px solid var(--line);border-radius:12px;padding:1px 8px;margin:4px 4px 0 0}
+details{margin-top:8px}summary{cursor:pointer;color:var(--accent);min-height:32px}
+.abs{white-space:pre-wrap;font-size:.95rem}
+nav.pg{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:16px 0}
+footer{color:var(--muted);font-size:.82rem;margin:28px 0 8px}
+@media (prefers-reduced-motion:no-preference){button{transition:opacity .15s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>BharatMed Research</h1>
+<p class="sub">Search PubMed for medical literature, with Indian research one tap away.</p>
+<div class="notice"><strong>Do not enter patient names, phone numbers or hospital IDs.</strong> This is a literature search tool for research use. It does not diagnose or advise treatment, and it has not been clinically validated.</div>
+
+<form id="f" role="search">
+  <input id="q" type="search" placeholder="e.g. dengue thrombocytopenia children" aria-label="Search query" minlength="2" maxlength="300" required>
+  <div class="row">
+    <input id="yf" type="number" placeholder="From year" aria-label="From year" min="1800" max="2100">
+    <input id="yt" type="number" placeholder="To year" aria-label="To year" min="1800" max="2100">
+    <select id="sort" aria-label="Sort by"><option value="relevance">Best match</option><option value="date">Newest first</option></select>
+  </div>
+  <label class="chk"><input id="in" type="checkbox"> Only papers with an Indian affiliation</label>
+  <button id="go" type="submit">Search PubMed</button>
+</form>
+
+<div id="status" role="status" aria-live="polite"></div>
+<div id="res"></div>
+<nav class="pg" id="pg" hidden>
+  <button class="alt" id="prev" type="button">Previous</button>
+  <span id="pn"></span>
+  <button class="alt" id="next" type="button">Next</button>
+</nav>
+<footer>Records come from NCBI PubMed. Any field marked "Not available" was not supplied by the source. Always read the original article.</footer>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let page=1,total=0,size=10;
+function el(tag,props={},...kids){const e=document.createElement(tag);Object.assign(e,props);kids.forEach(k=>e.append(k));return e}
+function line(label,val){const p=el("p",{className:"meta"});p.append(label+": ");p.append(val?val:el("span",{className:"na",textContent:"Not available"}));return p}
+function card(a){
+  const c=el("article");
+  c.append(el("h2",{textContent:a.title||"Title not available"}));
+  const au=a.authors.length?(a.authors.slice(0,6).join(", ")+(a.authors.length>6?" et al.":"")):null;
+  c.append(line("Authors",au),line("Journal",a.journal),line("Published",a.publication_date));
+  c.append(line("PMID",a.pmid),line("PMCID",a.pmcid),line("DOI",a.doi));
+  const ids=el("p",{className:"ids"});
+  if(a.url)ids.append(el("a",{href:a.url,target:"_blank",rel:"noopener",textContent:"PubMed"}));
+  if(a.doi_url)ids.append(el("a",{href:a.doi_url,target:"_blank",rel:"noopener",textContent:"DOI link"}));
+  if(a.pmc_url)ids.append(el("a",{href:a.pmc_url,target:"_blank",rel:"noopener",textContent:"Free full text (PMC)"}));
+  c.append(ids);
+  a.publication_types.slice(0,3).forEach(t=>c.append(el("span",{className:"tag",textContent:t})));
+  const d=el("details");d.append(el("summary",{textContent:"Abstract"}));
+  d.append(a.abstract?el("div",{className:"abs",textContent:a.abstract}):el("p",{className:"na",textContent:"No abstract in the source record."}));
+  c.append(d);return c;
+}
+async function run(){
+  const q=$("q").value.trim();if(q.length<2)return;
+  const body={query:q,page,page_size:size,india_only:$("in").checked,sort:$("sort").value};
+  if($("yf").value)body.year_from=+$("yf").value;if($("yt").value)body.year_to=+$("yt").value;
+  $("go").disabled=true;$("status").className="";$("status").textContent="Searching PubMed…";$("res").replaceChildren();$("pg").hidden=true;
+  try{
+    const r=await fetch("/api/v1/research/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error?j.error.message:"Something went wrong.");
+    total=j.total;
+    if(!j.items.length){$("status").textContent="No results. Try fewer words, remove filters, or check spelling.";return}
+    $("status").textContent=total.toLocaleString()+" results found";
+    j.items.forEach(a=>$("res").append(card(a)));
+    const pages=Math.max(1,Math.ceil(Math.min(total,size*100)/size));
+    $("pn").textContent="Page "+page+" of "+pages;$("prev").disabled=page<=1;$("next").disabled=page>=pages;$("pg").hidden=false;
+  }catch(e){$("status").className="err";$("status").textContent=e.message||"Network problem. Check your connection and try again."}
+  finally{$("go").disabled=false}
+}
+$("f").addEventListener("submit",e=>{e.preventDefault();page=1;run()});
+$("prev").onclick=()=>{page--;run();scrollTo(0,0)};$("next").onclick=()=>{page++;run();scrollTo(0,0)};
+</script>
+</body>
+</html>
